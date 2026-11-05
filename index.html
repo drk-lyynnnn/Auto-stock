@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1d2327">
+<title>Abossey Okai Parts Hub</title>
+<style>
+:root{--ink:#1d2327;--bg:#e6e8e8;--card:#fff;--line:#cfd3d4;--yel:#f2b705;--red:#c8321f;--grn:#1f7a46;--mut:#5d676c}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+h1,h2,h3{margin:0;line-height:1.2}
+button,input,select{font:inherit}
+input,select{width:100%;padding:12px;border:1.5px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+input:focus,select:focus,button:focus-visible{outline:3px solid var(--yel);outline-offset:1px}
+label{display:block;margin:12px 0 0;font-weight:600;font-size:14px}
+label input,label select{margin-top:4px;font-weight:400}
+.btn{background:var(--yel);color:var(--ink);border:0;border-radius:6px;padding:12px 16px;font-weight:700;cursor:pointer;width:100%;margin-top:16px}
+.btn.sm{width:auto;margin:0;padding:8px 12px;font-size:14px}
+.btn.ghost{background:transparent;border:1.5px solid var(--ink)}
+.btn.red{background:var(--red);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.muted{color:var(--mut);font-size:14px}
+.login{max-width:420px;margin:0 auto;padding:32px 20px}
+.login h1{font-size:28px;margin:12px 0 4px}
+.plate{display:inline-block;background:var(--yel);border:3px solid var(--ink);border-radius:6px;padding:4px 12px;font-weight:800;letter-spacing:1px}
+.seg{display:flex;margin-top:20px;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.seg button{flex:1;padding:12px;border:0;background:#fff;font-weight:700;cursor:pointer}
+.seg button.on{background:var(--ink);color:var(--yel)}
+header{background:var(--ink);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:0;z-index:5}
+header b{color:var(--yel)}
+header button{background:none;border:1px solid #6b767b;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer}
+main.app{max-width:760px;margin:0 auto;padding:16px 16px 90px}
+nav.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:2px solid var(--ink);display:flex;z-index:6;padding-bottom:env(safe-area-inset-bottom,0)}
+nav.tabs button{flex:1;padding:14px 4px;border:0;background:none;font-weight:700;cursor:pointer;color:var(--mut)}
+nav.tabs button.on{color:var(--ink);box-shadow:inset 0 4px 0 var(--yel)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:12px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.part{padding:10px 0;border-top:1px solid var(--line)}
+.part:first-of-type{border-top:0}
+.price{font-weight:800}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.stat{background:#fff;border-left:5px solid var(--yel);border-radius:6px;padding:12px}
+.stat b{display:block;font-size:24px}
+.tag{display:inline-block;font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--ink);color:#fff}
+.tag.g{background:var(--grn)}.tag.r{background:var(--red)}
+.steps{display:flex;gap:4px;margin:10px 0}
+.steps i{flex:1;height:6px;border-radius:3px;background:var(--line)}
+.steps i.done{background:var(--grn)}
+.steps i.now{background:var(--yel)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pl{display:flex;gap:10px;align-items:center}.thumb{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:none}.ph{display:flex;align-items:center;justify-content:center;background:var(--bg);font-size:28px;color:var(--mut)}
+dialog{border:0;border-radius:10px;padding:18px;width:min(92vw,420px)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+.empty{text-align:center;padding:28px 12px;color:var(--mut)}
+@media(prefers-reduced-motion:no-preference){.card{transition:box-shadow .15s}.card:hover{box-shadow:0 2px 10px rgba(0,0,0,.12)}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<dialog id="dlg"></dialog>
+<script>
+"use strict";
+/* ---------- Data layer: talks to the backend in /api/rpc ---------- */
+const KU = "aok_auth";
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = n => "GH₵" + Number(n || 0).toFixed(2);
+const load = (k, f) => { try { return JSON.parse(localStorage.getItem(k)) || f; } catch { return f; } };
+const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+let auth = load(KU, null), user = auth ? auth.user : null, db = { dealers: [], orders: [] };
+
+async function api(action, data) {
+  try {
+    const r = await fetch("/api/rpc", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (auth ? auth.token : "") }, body: JSON.stringify({ action, ...data }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401 && auth) { logout(); return { error: "Please log in again." }; }
+    return r.ok ? j : { error: j.error || "Something went wrong. Try again." };
+  } catch { return { error: "No connection. Check your internet and try again." }; }
+}
+async function refresh() { const j = await api("sync"); if (!j.error) db = j; return j; }
+async function mut(action, data) {
+  const j = await api(action, data);
+  if (j.error) { alert(j.error); return false; }
+  await refresh(); render(); return true;
+}
+
+/* ---------- State ---------- */
+let role = "buyer", mode = "login", form = {}, tab = "", q = "";
+const myDealer = () => db.dealers.find(d => d.id === user.dealerId);
+const stepsFor = o => o.mode === "delivery"
+  ? ["New", "Confirmed", "Out for delivery", "Delivered"]
+  : ["New", "Confirmed", "Ready for pickup", "Collected"];
+
+/* ---------- Login ---------- */
+function keep() { ["n", "p", "w", "s", "l"].forEach(i => { const e = $("#" + i); if (e) form[i] = e.value; }); }
+function setRole(r) { keep(); role = r; render(); }
+function setMode(m) { keep(); mode = m; render(); }
+function loginHTML() {
+  const su = mode === "signup";
+  return `<main class="login">
+  <span class="plate">ABOSSEY OKAI</span>
+  <h1>Parts Hub</h1>
+  <p class="muted">Find spare parts from dealers around you, or manage your shop and orders.</p>
+  <div class="seg"><button class="${!su ? "on" : ""}" onclick="setMode('login')">Log in</button><button class="${su ? "on" : ""}" onclick="setMode('signup')">Create account</button></div>
+  ${su ? `<div class="seg" role="group" aria-label="I am a">
+    <button class="${role === "buyer" ? "on" : ""}" onclick="setRole('buyer')">Buyer</button>
+    <button class="${role === "seller" ? "on" : ""}" onclick="setRole('seller')">Seller</button></div>
+  <label>Your name<input id="n" autocomplete="name" value="${esc(form.n)}"></label>` : ""}
+  <label>Phone number<input id="p" type="tel" inputmode="tel" autocomplete="tel" value="${esc(form.p)}"></label>
+  <label>Password<input id="w" type="password" autocomplete="${su ? "new-password" : "current-password"}"></label>
+  ${su && role === "seller" ? `<label>Shop name<input id="s" value="${esc(form.s)}"></label>
+  <label>Shop location<input id="l" placeholder="e.g. Block C, Abossey Okai" value="${esc(form.l)}"></label>` : ""}
+  <button class="btn" id="go" onclick="login()">${su ? "Create account" : "Log in"}</button>
+  <p id="err" class="muted" style="color:var(--red)" role="alert"></p>
+  </main>`;
+}
+async function login() {
+  keep();
+  const su = mode === "signup", err = m => { $("#err").textContent = m; };
+  const n = (form.n || "").trim(), p = (form.p || "").replace(/\s/g, ""), w = form.w || "";
+  if (su && n.length < 2) return err("Enter your name.");
+  if (!/^\+?\d{9,13}$/.test(p)) return err("Enter a valid phone number, e.g. 0244123456.");
+  if (w.length < 6) return err("Password must be at least 6 characters.");
+  if (su && role === "seller" && (form.s || "").trim().length < 2) return err("Enter your shop name.");
+  $("#go").disabled = true; err("Please wait…");
+  const j = await api(su ? "register" : "login", { name: n, phone: p, password: w, role, shop: (form.s || "").trim(), location: (form.l || "").trim() });
+  if (j.error) { $("#go").disabled = false; return err(j.error); }
+  auth = { token: j.token, user: j.user }; user = j.user; save(KU, auth); form.w = ""; tab = ""; q = "";
+  start();
+}
+async function start() { render(); await refresh(); render(); }
+function logout() { auth = null; user = null; localStorage.removeItem(KU); db = { dealers: [], orders: [] }; tab = ""; render(); }
+
+/* ---------- Photos: shrink to ~480px JPEG so they fit in browser storage ---------- */
+function shrink(file, cb) {
+  const r = new FileReader();
+  r.onerror = () => cb("");
+  r.onload = () => {
+    const im = new Image();
+    im.onerror = () => cb("");
+    im.onload = () => {
+      const k = Math.min(1, 480 / Math.max(im.width, im.height)), c = document.createElement("canvas");
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+      cb(c.toDataURL("image/jpeg", 0.7));
+    };
+    im.src = r.result;
+  };
+  r.readAsDataURL(file);
+}
+const thumb = p => p.img ? `<img class="thumb" src="${p.img}" alt="${esc(p.name)}">` : `<div class="thumb ph" aria-hidden="true">⚙</div>`;
+function pickPhoto(id) {
+  const i = document.createElement("input"); i.type = "file"; i.accept = "image/*";
+  i.onchange = () => { if (i.files[0]) shrink(i.files[0], img => { if (!img) return alert("Could not read that photo."); mut("updatePart", { id, img }); }); };
+  i.click();
+}
+
+/* ---------- Shared bits ---------- */
+const header = () => `<header><div><b>Parts Hub</b> &nbsp;${esc(user.name)}</div><button onclick="logout()">Log out</button></header>`;
+function orderCard(o, seller) {
+  const st = stepsFor(o), last = o.status >= st.length - 1;
+  const d = db.dealers.find(x => x.id === o.dealerId);
+  return `<div class="card">
+  <div class="row"><b>${esc(o.part)} × ${o.qty}</b><span class="tag ${last ? "g" : ""}">${st[o.status]}</span></div>
+  <div class="muted">${seller ? "Buyer: " + esc(o.buyerName) + " · " + esc(o.buyerPhone) : "From: " + esc(d ? d.name : "Dealer")}</div>
+  <div class="muted">${o.mode === "delivery" ? "Delivery to " + esc(o.address) : "Buyer picks up at shop"} · ${money(o.total)}</div>
+  ${o.rider ? `<div class="muted">Rider: ${esc(o.rider)}</div>` : ""}
+  <div class="steps">${st.map((_, i) => `<i class="${i < o.status || last ? "done" : i === o.status ? "now" : ""}"></i>`).join("")}</div>
+  ${seller && !last ? `<button class="btn sm" onclick="advance('${o.id}')">Mark as ${st[o.status + 1]}</button>` : ""}
+  </div>`;
+}
+
+/* ---------- Buyer ---------- */
+function partsHTML() {
+  const s = q.trim().toLowerCase();
+  const res = db.dealers.map(d => {
+    const dm = (d.name + " " + d.location).toLowerCase().includes(s);
+    const ps = d.parts.filter(p => !s || dm || (p.name + " " + p.brand).toLowerCase().includes(s));
+    return { d, ps, show: !s || dm || ps.length };
+  }).filter(x => x.show);
+  if (!db.dealers.length) return `<div class="empty">No dealers have joined yet. Check back soon.</div>`;
+  if (!res.length) return `<div class="empty">No dealer or part matches "${esc(q)}". Try a shorter word like "brake".</div>`;
+  return res.map(({ d, ps }) => `<div class="card">
+    <div class="row"><h3>${esc(d.name)}</h3><a class="btn sm ghost" style="text-decoration:none;color:inherit" href="tel:${esc(d.phone)}">Call</a></div>
+    <div class="muted">${esc(d.location)}</div>
+    ${ps.length ? ps.map(p => `<div class="part row"><div class="pl">${thumb(p)}<div><b>${esc(p.name)}</b><div class="muted">${esc(p.brand)} · ${p.stock > 0 ? p.stock + " in stock" : "Out of stock"}</div></div></div>
+      <div style="text-align:right"><div class="price">${money(p.price)}</div><button class="btn sm" ${p.stock < 1 ? "disabled" : ""} onclick="orderForm('${d.id}','${p.id}')">Order</button></div></div>`).join("")
+      : `<p class="muted">This dealer has not listed any parts yet.</p>`}
+  </div>`).join("");
+}
+function buyerHTML() {
+  tab = tab || "find";
+  const mine = db.orders.filter(o => o.buyerPhone === user.phone && !o.sample).sort((a, b) => b.at - a.at);
+  return header() + `<main class="app">` + (tab === "find"
+    ? `<label style="margin:0">Search dealer or part<input id="q" type="search" placeholder="e.g. brake pads, Toyota, Block C" value="${esc(q)}" oninput="q=this.value;$('#res').innerHTML=partsHTML()"></label><div id="res">${partsHTML()}</div>`
+    : `<h2>My orders</h2>` + (mine.length ? mine.map(o => orderCard(o, false)).join("") : `<div class="empty">No orders yet. Find a part and tap Order.</div>`))
+    + `</main><nav class="tabs"><button class="${tab === "find" ? "on" : ""}" onclick="go('find')">Find parts</button><button class="${tab === "orders" ? "on" : ""}" onclick="go('orders')">My orders (${mine.length})</button></nav>`;
+}
+function orderForm(did, pid) {
+  const d = db.dealers.find(x => x.id === did), p = d.parts.find(x => x.id === pid);
+  $("#dlg").innerHTML = `<h3>${esc(p.name)}</h3><p class="muted">${esc(d.name)} · ${money(p.price)} each</p>
+  <label>Quantity<input id="oq" type="number" min="1" max="${p.stock}" value="1"></label>
+  <label>How will you get it?<select id="om" onchange="$('#oa').parentElement.style.display=this.value==='delivery'?'block':'none'"><option value="pickup">I will pick up at the shop</option><option value="delivery">Deliver to me</option></select></label>
+  <label style="display:none">Delivery address<input id="oa" placeholder="Area, landmark, house no."></label>
+  <p id="oe" class="muted" style="color:var(--red)" role="alert"></p>
+  <div class="two"><button class="btn ghost" onclick="$('#dlg').close()">Cancel</button><button class="btn" onclick="placeOrder('${did}','${pid}')">Place order</button></div>`;
+  $("#dlg").showModal();
+}
+async function placeOrder(did, pid) {
+  const d = db.dealers.find(x => x.id === did), p = d.parts.find(x => x.id === pid);
+  const qty = parseInt($("#oq").value, 10), mode = $("#om").value, addr = $("#oa").value.trim();
+  if (!(qty >= 1 && qty <= p.stock)) return ($("#oe").textContent = "Choose a quantity between 1 and " + p.stock + ".");
+  if (mode === "delivery" && addr.length < 4) return ($("#oe").textContent = "Enter a delivery address.");
+  const j = await api("placeOrder", { partId: pid, qty, mode, address: addr });
+  if (j.error) return ($("#oe").textContent = j.error);
+  $("#dlg").close(); tab = "orders"; await refresh(); render();
+}
+
+/* ---------- Seller ---------- */
+function sellerHTML() {
+  tab = tab || "home";
+  const d = myDealer();
+  if (!d) return header() + `<main class="app"><div class="empty">Loading your shop…</div></main>`;
+  const os = db.orders.filter(o => o.dealerId === d.id).sort((a, b) => b.at - a.at);
+  const active = os.filter(o => o.status < stepsFor(o).length - 1);
+  const rev = os.filter(o => o.status === stepsFor(o).length - 1).reduce((s, o) => s + o.total, 0);
+  let body;
+  if (tab === "home") {
+    body = `<h2>${esc(d.name)}</h2><p class="muted">${esc(d.location)}</p>
+    <div class="stats"><div class="stat"><b>${d.parts.length}</b>Parts listed</div><div class="stat"><b>${os.filter(o => o.status === 0).length}</b>New orders</div>
+    <div class="stat"><b>${os.filter(o => o.mode === "delivery" && o.status === 2).length}</b>Out for delivery</div><div class="stat"><b>${money(rev)}</b>Completed sales</div></div>
+    <h3 style="margin-top:20px">What you are selling</h3>${stockList(d)}
+    <h3 style="margin-top:20px">Orders in progress</h3>${active.length ? active.map(o => orderCard(o, true)).join("") : `<div class="empty">No open orders.</div>`}`;
+  } else if (tab === "stock") {
+    body = `<h2>My stock</h2><div class="card"><h3>Add a part</h3>
+    <label>Part name<input id="pn" placeholder="e.g. Brake pads (front)"></label>
+    <label>Car model / brand<input id="pb" placeholder="e.g. Toyota Corolla"></label>
+    <label>Photo (optional)<input id="pi" type="file" accept="image/*"></label>
+    <div class="two"><label>Price (GH₵)<input id="pp" type="number" min="0" step="0.01" inputmode="decimal"></label><label>Quantity<input id="ps" type="number" min="0" inputmode="numeric"></label></div>
+    <p id="pe" class="muted" style="color:var(--red)" role="alert"></p><button class="btn" onclick="addPart()">Add part</button></div>${stockList(d, true)}`;
+  } else {
+    body = `<h2>Orders & delivery</h2>` + (os.length ? os.map(o => orderCard(o, true)).join("") : `<div class="empty">No orders yet.</div>`);
+  }
+  const t = (k, l) => `<button class="${tab === k ? "on" : ""}" onclick="go('${k}')">${l}</button>`;
+  return header() + `<main class="app">${body}</main><nav class="tabs">${t("home", "Dashboard")}${t("stock", "Stock")}${t("orders", "Orders (" + active.length + ")")}</nav>`;
+}
+function stockList(d, edit) {
+  if (!d.parts.length) return `<div class="empty">No parts yet. Open the Stock tab to add your first part.</div>`;
+  return `<div class="card">` + d.parts.map(p => `<div class="part row"><div class="pl">${thumb(p)}<div><b>${esc(p.name)}</b><div class="muted">${esc(p.brand)} · ${p.stock} in stock ${p.stock < 3 ? '<span class="tag r">Low</span>' : ""}</div></div></div>
+  <div style="text-align:right"><div class="price">${money(p.price)}</div>${edit ? `<button class="btn sm ghost" onclick="pickPhoto('${p.id}')">Photo</button> <button class="btn sm ghost" onclick="editPart('${p.id}')">Edit</button> <button class="btn sm red" onclick="delPart('${p.id}')">Delete</button>` : ""}</div></div>`).join("") + `</div>`;
+}
+function addPart() {
+  const name = $("#pn").value.trim(), brand = $("#pb").value.trim(), price = parseFloat($("#pp").value), stock = parseInt($("#ps").value, 10);
+  if (!name || !(price >= 0) || !(stock >= 0)) return ($("#pe").textContent = "Enter the part name, price and quantity.");
+  const f = $("#pi").files[0], done = img => mut("addPart", { name, brand: brand || "All models", price, stock, img });
+  f ? shrink(f, done) : done("");
+}
+function editPart(id) {
+  const p = myDealer().parts.find(x => x.id === id);
+  const pr = prompt("New price in GH₵ for " + p.name, p.price); if (pr === null) return;
+  const st = prompt("Quantity in stock", p.stock); if (st === null) return;
+  if (!(parseFloat(pr) >= 0) || !(parseInt(st, 10) >= 0)) return alert("Enter valid numbers.");
+  mut("updatePart", { id, price: parseFloat(pr), stock: parseInt(st, 10) });
+}
+function delPart(id) { if (confirm("Remove this part from your shop?")) mut("deletePart", { id }); }
+function advance(id) {
+  const o = db.orders.find(x => x.id === id); let rider = "";
+  if (o.mode === "delivery" && o.status === 1) { rider = (prompt("Rider name and phone number (e.g. Kojo 0244000000)") || "").trim(); if (!rider) return; }
+  mut("advance", { id, rider });
+}
+
+/* ---------- Router ---------- */
+function go(t) { tab = t; render(); window.scrollTo(0, 0); }
+function render() {
+  $("#app").innerHTML = !user ? loginHTML() : user.role === "buyer" ? buyerHTML() : sellerHTML();
+}
+user ? start() : render();
+const busy = () => $("#dlg").open || /INPUT|SELECT/.test(document.activeElement.tagName);
+setInterval(() => { if (user && !busy()) refresh().then(() => { if (user && !busy()) render(); }); }, 20000);
+</script>
+</body>
+</html>
