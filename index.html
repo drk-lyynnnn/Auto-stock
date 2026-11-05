@@ -75,7 +75,7 @@ async function api(action, data) {
     const r = await fetch("/api/rpc", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (auth ? auth.token : "") }, body: JSON.stringify({ action, ...data }) });
     const j = await r.json().catch(() => ({}));
     if (r.status === 401 && auth) { logout(); return { error: "Please log in again." }; }
-    return r.ok ? j : { error: j.error || "Something went wrong. Try again." };
+    return r.ok ? j : { error: j.error || "Server problem (code " + r.status + "). Open /api/rpc on your site to see what is wrong." };
   } catch { return { error: "No connection. Check your internet and try again." }; }
 }
 async function refresh() { const j = await api("sync"); if (!j.error) db = j; return j; }
