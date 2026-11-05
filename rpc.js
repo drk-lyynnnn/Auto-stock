@@ -1,6 +1,8 @@
 // Vercel serverless function. No npm packages needed (Node 18+).
 const crypto = require("crypto");
-const { SUPABASE_URL, SUPABASE_SERVICE_KEY: KEY, AUTH_SECRET: SECRET } = process.env;
+const clean = v => String(v || "").trim();
+const SUPABASE_URL = clean(process.env.SUPABASE_URL).replace(/\/+$/, "").replace(/\/rest\/v1$/, "");
+const KEY = clean(process.env.SUPABASE_SERVICE_KEY), SECRET = clean(process.env.AUTH_SECRET);
 const enc = encodeURIComponent;
 
 async function sb(path, method = "GET", body) {
@@ -32,6 +34,13 @@ const session = (u, dealerId) => {
 
 module.exports = async (req, res) => {
   const say = (c, o) => res.status(c).json(o);
+  if (req.method === "GET") { // health check: open /api/rpc in a browser. Shows no secrets.
+    let keyType = "missing";
+    if (KEY) { try { keyType = JSON.parse(Buffer.from(KEY.split(".")[1], "base64url")).role; } catch { keyType = KEY.startsWith("sb_secret_") ? "service_role (new format)" : KEY.startsWith("sb_publishable_") ? "anon - WRONG KEY" : "unknown format"; } }
+    let db = "not tested";
+    if (SUPABASE_URL && KEY) { try { await sb("users?select=id&limit=1"); db = "ok"; } catch (e) { db = "failed: " + String(e.message).slice(0, 250); } }
+    return say(200, { SUPABASE_URL_set: !!SUPABASE_URL, SUPABASE_URL_looks_right: /^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(SUPABASE_URL), SUPABASE_SERVICE_KEY_set: !!KEY, key_type: keyType, AUTH_SECRET_set: !!SECRET, database: db });
+  }
   if (req.method !== "POST") return say(405, { error: "POST only" });
   if (!SUPABASE_URL || !KEY || !SECRET) return say(500, { error: "Server is not configured yet." });
   const b = req.body || {};
