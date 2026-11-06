@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1d2327">
-<title>AutoStock Car Parts Hub</title>
+<title>Abossey Okai Parts Hub</title>
 <style>
 :root{--ink:#1d2327;--bg:#e6e8e8;--card:#fff;--line:#cfd3d4;--yel:#f2b705;--red:#c8321f;--grn:#1f7a46;--mut:#5d676c}
 *{box-sizing:border-box}
@@ -173,15 +173,17 @@ function orderCard(o, seller) {
 
 /* ---------- Buyer ---------- */
 function partsHTML() {
-  const s = q.trim().toLowerCase();
+  const w = q.trim().toLowerCase().split(/\s+/).filter(Boolean), has = (t) => w.every(x => t.includes(x));
   const res = db.dealers.map(d => {
-    const dm = (d.name + " " + d.location).toLowerCase().includes(s);
-    const ps = d.parts.filter(p => !s || dm || (p.name + " " + p.brand).toLowerCase().includes(s));
-    return { d, ps, show: !s || dm || ps.length };
+    const dt = (d.name + " " + d.location).toLowerCase(), dm = w.length > 0 && has(dt);
+    const ps = d.parts.filter(p => !w.length || dm || has((p.name + " " + p.brand + " " + dt).toLowerCase()));
+    return { d, ps, show: !w.length || dm || ps.length };
   }).filter(x => x.show);
+  const n = res.reduce((a, x) => a + x.ps.length, 0);
+  const summary = w.length && res.length ? `<p class="muted">${n} part${n === 1 ? "" : "s"} found from ${res.length} dealer${res.length === 1 ? "" : "s"}</p>` : "";
   if (!db.dealers.length) return `<div class="empty">No dealers have joined yet. Check back soon.</div>`;
   if (!res.length) return `<div class="empty">No dealer or part matches "${esc(q)}". Try a shorter word like "brake".</div>`;
-  return res.map(({ d, ps }) => `<div class="card">
+  return summary + res.map(({ d, ps }) => `<div class="card">
     <div class="row"><h3>${esc(d.name)}</h3><a class="btn sm ghost" style="text-decoration:none;color:inherit" href="tel:${esc(d.phone)}">Call</a></div>
     <div class="muted">${esc(d.location)}</div>
     ${ps.length ? ps.map(p => `<div class="part row"><div class="pl">${thumb(p)}<div><b>${esc(p.name)}</b><div class="muted">${esc(p.brand)} · ${p.stock > 0 ? p.stock + " in stock" : "Out of stock"}</div></div></div>
@@ -281,4 +283,3 @@ setInterval(() => { if (user && !busy()) refresh().then(() => { if (user && !bus
 </script>
 </body>
 </html>
-
