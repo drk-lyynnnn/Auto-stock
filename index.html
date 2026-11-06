@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#1d2327">
-<title>Abossey Okai Parts Hub</title>
+<title>Autostock Car Parts Hub</title>
 <style>
 :root{--ink:#1d2327;--bg:#e6e8e8;--card:#fff;--line:#cfd3d4;--yel:#f2b705;--red:#c8321f;--grn:#1f7a46;--mut:#5d676c}
 *{box-sizing:border-box}
@@ -99,9 +99,9 @@ function setMode(m) { keep(); mode = m; render(); }
 function loginHTML() {
   const su = mode === "signup";
   return `<main class="login">
-  <span class="plate">ABOSSEY OKAI</span>
-  <h1>Parts Hub</h1>
-  <p class="muted">Find spare parts from dealers around you, or manage your shop and orders.</p>
+  <span class="plate">AUTOSTOCK</span>
+  <h1>Car Parts Hub</h1>
+  <p class="muted">Find spare parts from dealers around Abossey Okai, or manage your shop and orders.</p>
   <div class="seg"><button class="${!su ? "on" : ""}" onclick="setMode('login')">Log in</button><button class="${su ? "on" : ""}" onclick="setMode('signup')">Create account</button></div>
   ${su ? `<div class="seg" role="group" aria-label="I am a">
     <button class="${role === "buyer" ? "on" : ""}" onclick="setRole('buyer')">Buyer</button>
@@ -157,7 +157,7 @@ function pickPhoto(id) {
 }
 
 /* ---------- Shared bits ---------- */
-const header = () => `<header><div><b>Parts Hub</b> &nbsp;${esc(user.name)}</div><button onclick="logout()">Log out</button></header>`;
+const header = () => `<header><div><b>Autostock</b> &nbsp;${esc(user.name)}</div><button onclick="logout()">Log out</button></header>`;
 function orderCard(o, seller) {
   const st = stepsFor(o), last = o.status >= st.length - 1;
   const d = db.dealers.find(x => x.id === o.dealerId);
